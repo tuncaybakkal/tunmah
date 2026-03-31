@@ -146,7 +146,7 @@ export default function App() {
               <button 
                 onClick={joinGame}
                 disabled={!playerName.trim() || gameState.players.length >= 2}
-                className="w-full py-4 bg-orange-500 text-black font-black rounded-xl hover:bg-orange-400 active:scale-95 transition-all uppercase tracking-widest disabled:opacity-50 disabled:grayscale"
+                className="w-full py-4 bg-orange-500 text-black font-bold rounded-xl hover:bg-orange-400 active:scale-95 transition-all uppercase tracking-widest disabled:opacity-50 disabled:grayscale"
               >
                 Masaya Otur
               </button>
@@ -173,6 +173,15 @@ export default function App() {
             </div>
             <h2 className="text-2xl font-black uppercase tracking-tighter italic">RAKİP BEKLENİYOR...</h2>
             <p className="text-zinc-500 text-sm uppercase tracking-widest">Masa Hazırlanıyor</p>
+            
+            {gameState.players.length === 1 && (
+              <button 
+                onClick={() => socket?.emit("playWithRobot")}
+                className="mt-8 px-8 py-3 bg-zinc-800 text-white font-bold rounded-xl hover:bg-zinc-700 active:scale-95 transition-all uppercase tracking-widest border border-zinc-700"
+              >
+                Robot ile Oyna
+              </button>
+            )}
           </div>
         </div>
       );
@@ -184,19 +193,19 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-6 font-mono">
         <div className="text-center space-y-8">
-          <h2 className="text-2xl font-black uppercase tracking-tighter italic">KİM BAŞLAYACAK?</h2>
+          <h2 className="text-2xl font-bold uppercase tracking-tighter italic">KİM BAŞLAYACAK?</h2>
           
           <div className="flex gap-12 items-center justify-center">
             <div className="flex flex-col items-center gap-2">
               <span className="text-[10px] text-zinc-500 uppercase tracking-widest">{gameState.players[0].name}</span>
-              <div className="w-20 h-20 bg-[#151619] border-2 border-orange-500 rounded-2xl flex items-center justify-center text-4xl font-black">
+              <div className="w-20 h-20 bg-[#151619] border-2 border-orange-500 rounded-2xl flex items-center justify-center text-4xl font-semibold">
                 {gameState.diceResults?.p1 || "?"}
               </div>
             </div>
-            <div className="text-orange-500 font-black text-2xl">VS</div>
+            <div className="text-orange-500 font-semibold text-2xl">VS</div>
             <div className="flex flex-col items-center gap-2">
               <span className="text-[10px] text-zinc-500 uppercase tracking-widest">{gameState.players[1].name}</span>
-              <div className="w-20 h-20 bg-[#151619] border-2 border-orange-500 rounded-2xl flex items-center justify-center text-4xl font-black">
+              <div className="w-20 h-20 bg-[#151619] border-2 border-orange-500 rounded-2xl flex items-center justify-center text-4xl font-semibold">
                 {gameState.diceResults?.p2 || "?"}
               </div>
             </div>
@@ -204,7 +213,7 @@ export default function App() {
 
           <button 
             onClick={rollDice}
-            className="px-12 py-4 bg-orange-500 text-black font-black rounded-xl hover:bg-orange-400 active:scale-95 transition-all uppercase tracking-widest shadow-[0_0_30px_rgba(249,115,22,0.3)]"
+            className="px-12 py-4 bg-orange-500 text-black font-semibold rounded-xl hover:bg-orange-400 active:scale-95 transition-all uppercase tracking-widest shadow-[0_0_30px_rgba(249,115,22,0.3)]"
           >
             Zar At
           </button>
@@ -226,12 +235,12 @@ export default function App() {
             <Trophy className="w-16 h-16 text-orange-500" />
           </div>
           <div>
-            <h1 className="text-4xl font-black uppercase tracking-tighter italic">OYUN BİTTİ</h1>
-            <p className="text-xl text-orange-500 font-bold mt-2 uppercase tracking-widest">Kazanan: {gameState.winner}</p>
+            <h1 className="text-4xl font-semibold uppercase tracking-tighter italic">OYUN BİTTİ</h1>
+            <p className="text-xl text-orange-500 font-medium mt-2 uppercase tracking-widest">Kazanan: {gameState.winner}</p>
           </div>
           <button 
             onClick={resetGame}
-            className="px-12 py-4 bg-white text-black font-black rounded-xl hover:bg-zinc-200 active:scale-95 transition-all uppercase tracking-widest"
+            className="px-12 py-4 bg-white text-black font-semibold rounded-xl hover:bg-zinc-200 active:scale-95 transition-all uppercase tracking-widest"
           >
             Yeni Oyun
           </button>
@@ -257,10 +266,10 @@ export default function App() {
             isMyTurn ? "bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" : "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]"
           )} />
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+            <span className="text-[10px] uppercase tracking-widest text-zinc-400">
               {isMyTurn ? "Sizin Sıranız" : "Rakibin Sırası"}
             </span>
-            <span className="text-xs font-black uppercase text-white">
+            <span className="text-xs font-semibold uppercase text-white">
               {displayPlayer.name} Tahtası
             </span>
           </div>
@@ -269,7 +278,7 @@ export default function App() {
         {/* Timer Display */}
         <div className="flex flex-col items-center">
           <div className={cn(
-            "text-2xl font-black transition-colors duration-300",
+            "text-2xl font-semibold transition-colors duration-300",
             gameState.timer <= 3 ? "text-red-500 animate-pulse" : "text-orange-500"
           )}>
             {gameState.timer < 10 ? `0${gameState.timer}` : gameState.timer}
@@ -301,51 +310,62 @@ export default function App() {
             animate={{ opacity: 1 }}
             className="absolute inset-0 bg-black/60 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center pointer-events-none"
           >
-            <div className="bg-orange-500 text-black px-6 py-2 rounded-full font-black text-sm uppercase tracking-tighter shadow-2xl animate-pulse">
+            <div className="bg-orange-500 text-black px-6 py-2 rounded-full font-semibold text-sm uppercase tracking-tighter shadow-2xl animate-pulse">
               RAKİP HAMLESİ İZLENİYOR...
             </div>
           </motion.div>
         )}
 
         {/* The Grid Container */}
-        <div className="flex-1 flex flex-col items-center justify-center p-2 sm:p-6">
-          <div className="w-full max-w-[500px] aspect-square bg-[#151619] border-2 border-[#2a2b2e] rounded-3xl p-3 shadow-2xl flex flex-col relative">
+        <div className="flex-1 flex flex-col items-center justify-center p-1 sm:p-6">
+          <div className="w-full max-w-[500px] aspect-square bg-[#151619] border-2 border-[#2a2b2e] rounded-2xl sm:rounded-3xl p-1.5 sm:p-3 shadow-2xl flex flex-col relative">
             
             {/* Push Buttons */}
-            <div className="grid grid-cols-6 gap-2 mb-3">
+            <div className="grid grid-cols-6 gap-1 sm:gap-2 mb-1.5 sm:mb-3">
               {[0, 1, 2, 3, 4, 5].map(i => (
                 <button
                   key={i}
                   disabled={!isMyTurn}
                   onClick={() => pushTile(i)}
                   className={cn(
-                    "aspect-square rounded-xl flex items-center justify-center transition-all active:scale-90 border-2",
+                    "aspect-square rounded-lg sm:rounded-xl flex items-center justify-center transition-all active:scale-90 border-2",
                     isMyTurn 
-                      ? "bg-orange-500 text-black border-orange-400 shadow-[0_5px_0_rgb(194,65,12)]" 
+                      ? "bg-orange-500 text-black border-orange-400 shadow-[0_3px_0_rgb(194,65,12)] sm:shadow-[0_5px_0_rgb(194,65,12)]" 
                       : "bg-[#0a0a0a] text-zinc-800 border-[#2a2b2e] opacity-50"
                   )}
                 >
-                  <ArrowRight className="w-6 h-6 rotate-90" />
+                  <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 rotate-90" />
                 </button>
               ))}
             </div>
 
             {/* Tiles Grid */}
-            <div className="flex-1 grid grid-cols-6 gap-2">
+            <div className="flex-1 grid grid-cols-6 gap-1 sm:gap-2">
               {displayPlayer.grid.map((col, colIdx) => (
-                <div key={colIdx} className="flex flex-col gap-2">
+                <div key={colIdx} className="flex flex-col gap-1 sm:gap-2">
+                  {/* Render existing tiles */}
                   {col.map((tile) => (
-                    <div 
+                    <motion.div 
                       key={tile.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
                       className={cn(
-                        "flex-1 rounded-xl flex items-center justify-center text-3xl sm:text-5xl transition-all duration-500 shadow-inner",
+                        "flex-1 rounded-lg sm:rounded-xl flex items-center justify-center text-4xl sm:text-6xl transition-all duration-500 shadow-inner",
                         tile.isRevealed 
-                          ? "bg-[#fdfcf0] text-black border-b-4 border-zinc-300" 
+                          ? "bg-[#fdfcf0] text-black border-b-2 sm:border-b-4 border-zinc-300" 
                           : "bg-zinc-800/50 border border-zinc-700/30 text-transparent"
                       )}
                     >
                       {tile.isRevealed ? tile.symbol : ""}
-                    </div>
+                    </motion.div>
+                  ))}
+                  {/* Fill remaining slots with empty divs */}
+                  {Array.from({ length: 6 - col.length }).map((_, i) => (
+                    <div 
+                      key={`empty-${colIdx}-${i}`}
+                      className="flex-1 rounded-lg sm:rounded-xl bg-zinc-800/30 border border-zinc-700/10"
+                    />
                   ))}
                 </div>
               ))}
@@ -354,10 +374,10 @@ export default function App() {
         </div>
 
         {/* Active Tile Display (Bottom) */}
-        <div className="h-48 bg-[#151619] border-t-2 border-[#2a2b2e] flex flex-col items-center justify-center gap-4 shrink-0">
+        <div className="h-40 sm:h-48 bg-[#151619] border-t-2 border-[#2a2b2e] flex flex-col items-center justify-center gap-2 sm:gap-4 shrink-0">
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-center">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1 sm:mb-2">
                 {isMyTurn ? "SIRADAKİ TAŞINIZ" : "RAKİBİN ELİNDEKİ"}
               </span>
               
@@ -369,9 +389,9 @@ export default function App() {
                     animate={{ scale: 1, opacity: 1, rotate: 0 }}
                     exit={{ scale: 1.5, opacity: 0, rotate: 10 }}
                     className={cn(
-                      "w-20 h-24 rounded-2xl flex items-center justify-center text-5xl shadow-2xl border-2",
+                      "w-16 h-20 sm:w-20 sm:h-24 rounded-xl sm:rounded-2xl flex items-center justify-center text-5xl sm:text-6xl shadow-2xl border-2",
                       isMyTurn 
-                        ? "bg-[#fdfcf0] text-black border-zinc-300 border-b-8" 
+                        ? "bg-[#fdfcf0] text-black border-zinc-300 border-b-4 sm:border-b-8" 
                         : "bg-zinc-800 text-zinc-600 border-zinc-700 grayscale"
                     )}
                   >
@@ -385,7 +405,7 @@ export default function App() {
           {!isMyTurn && (
             <div className="flex items-center gap-2 text-orange-500">
               <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-ping" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Rakip Düşünüyor...</span>
+              <span className="text-[10px] uppercase tracking-widest">Rakip Düşünüyor...</span>
             </div>
           )}
         </div>
@@ -402,7 +422,7 @@ export default function App() {
             className="fixed bottom-6 left-6 right-6 bg-red-500 text-white p-4 rounded-xl flex items-center gap-3 shadow-2xl z-50"
           >
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <p className="text-xs font-bold uppercase tracking-widest">{error}</p>
+            <p className="text-xs uppercase tracking-widest">{error}</p>
           </motion.div>
         )}
       </AnimatePresence>
