@@ -1,0 +1,5 @@
+{
+  "name": "Mobil Düello: Tek Masa",
+  "description": "Sadece 2 oyuncunun aynı anda oynayabildiği, mobil uyumlu, sıra tabanlı bir kart düellosu oyunu.",
+  "requestFramePermissions": []
+}
