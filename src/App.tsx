@@ -12,7 +12,9 @@ import {
   RotateCcw, 
   User, 
   ArrowRight, 
-  AlertCircle 
+  AlertCircle,
+  Pause,
+  Play
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { clsx, type ClassValue } from "clsx";
@@ -43,6 +45,12 @@ interface GameState {
   winner: string | null;
   diceResults: { p1: number; p2: number } | null;
   timer: number;
+  sharedPool: Tile[];
+  consecutiveTurns: number;
+  lastTurnOwner: number | null;
+  isPaused: boolean;
+  pauseInitiatorId: string | null;
+  resumeRequestedById: string | null;
 }
 
 export default function App() {
@@ -96,6 +104,26 @@ export default function App() {
     if (socket) socket.emit("resetGame");
   };
 
+  const surrender = () => {
+    if (socket) socket.emit("surrender");
+  };
+
+  const pauseGame = () => {
+    if (socket) socket.emit("pauseGame");
+  };
+
+  const requestResume = () => {
+    if (socket) socket.emit("requestResume");
+  };
+
+  const acceptResume = () => {
+    if (socket) socket.emit("acceptResume");
+  };
+
+  const declineResume = () => {
+    if (socket) socket.emit("declineResume");
+  };
+
   if (!gameState) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center p-6">
@@ -127,7 +155,7 @@ export default function App() {
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-tighter uppercase">Mahjong Push</h1>
-                <p className="text-[10px] text-zinc-500 tracking-widest uppercase">Tek Masa • 1v1</p>
+                <p className="text-[10px] text-zinc-500 tracking-widest uppercase">Tek Masa • v2</p>
               </div>
             </div>
 
@@ -295,9 +323,26 @@ export default function App() {
           </div>
         </div>
 
-        <button onClick={resetGame} className="p-2 hover:bg-[#2a2b2e] rounded-lg transition-colors">
-          <RotateCcw className="w-4 h-4 text-zinc-500" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={pauseGame}
+            disabled={gameState.isPaused}
+            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400 hover:text-white disabled:opacity-50"
+            title="Oyunu Beklemeye Al"
+          >
+            <Pause className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={surrender}
+            className="p-2 hover:bg-red-900/20 rounded-lg transition-colors text-zinc-400 hover:text-red-500"
+            title="Pes Et"
+          >
+            <AlertCircle className="w-4 h-4" />
+          </button>
+          <button onClick={resetGame} className="p-2 hover:bg-[#2a2b2e] rounded-lg transition-colors">
+            <RotateCcw className="w-4 h-4 text-zinc-500" />
+          </button>
+        </div>
       </header>
 
       {/* Main Game Area */}
@@ -413,6 +458,65 @@ export default function App() {
       </main>
 
       {/* Error Toast */}
+      {/* Pause Overlay */}
+      <AnimatePresence>
+        {gameState.isPaused && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-6 text-center"
+          >
+            <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center mb-6 border border-orange-500/20">
+              <Pause className="w-10 h-10 text-orange-500" />
+            </div>
+            <h2 className="text-3xl font-semibold uppercase tracking-tighter italic mb-2">OYUN BEKLEMEDE</h2>
+            <p className="text-zinc-400 text-[10px] uppercase tracking-widest mb-8">
+              {gameState.pauseInitiatorId === socket?.id ? "Siz beklemeye aldınız." : "Rakip beklemeye aldı."}
+            </p>
+
+            <div className="flex flex-col gap-4 w-full max-w-xs">
+              {gameState.pauseInitiatorId === socket?.id && !gameState.resumeRequestedById && (
+                <button 
+                  onClick={requestResume}
+                  className="w-full py-4 bg-orange-500 text-black font-semibold rounded-xl hover:bg-orange-400 transition-all uppercase tracking-widest"
+                >
+                  Devam Etmek İste
+                </button>
+              )}
+
+              {gameState.resumeRequestedById === socket?.id && (
+                <p className="text-orange-500 text-[10px] uppercase tracking-widest animate-pulse">
+                  Rakibin onayı bekleniyor...
+                </p>
+              )}
+
+              {gameState.resumeRequestedById && gameState.resumeRequestedById !== socket?.id && (
+                <div className="flex flex-col gap-4">
+                  <p className="text-white text-xs uppercase tracking-widest mb-2">
+                    Rakip oyuna devam etmek istiyor. Hazır mısın?
+                  </p>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={acceptResume}
+                      className="flex-1 py-4 bg-green-500 text-black font-semibold rounded-xl hover:bg-green-400 transition-all uppercase tracking-widest"
+                    >
+                      Evet
+                    </button>
+                    <button 
+                      onClick={declineResume}
+                      className="flex-1 py-4 bg-red-500 text-white font-semibold rounded-xl hover:bg-red-400 transition-all uppercase tracking-widest"
+                    >
+                      Hayır
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {error && (
           <motion.div 

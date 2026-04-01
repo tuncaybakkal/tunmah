@@ -21,7 +21,6 @@ interface Player {
   id: string;
   name: string;
   grid: Tile[][]; // 6 columns
-  pool: Tile[]; // Remaining tiles not on grid
   lastTileSymbol?: string; // To ensure variety on next draw
 }
 
@@ -33,6 +32,12 @@ interface GameState {
   winner: string | null;
   diceResults: { p1: number; p2: number } | null;
   timer: number;
+  sharedPool: Tile[];
+  consecutiveTurns: number;
+  lastTurnOwner: number | null;
+  isPaused: boolean;
+  pauseInitiatorId: string | null;
+  resumeRequestedById: string | null;
 }
 
 let gameState: GameState = {
@@ -43,6 +48,12 @@ let gameState: GameState = {
   winner: null,
   diceResults: null,
   timer: 10,
+  sharedPool: [],
+  consecutiveTurns: 0,
+  lastTurnOwner: null,
+  isPaused: false,
+  pauseInitiatorId: null,
+  resumeRequestedById: null,
 };
 
 let turnInterval: NodeJS.Timeout | null = null;
@@ -50,7 +61,7 @@ let turnInterval: NodeJS.Timeout | null = null;
 const SYMBOLS_P1 = ["🀇", "🀈", "🀉", "🀊", "🀋", "🀌"]; // 1-6 Myriads
 const SYMBOLS_P2 = ["🀀", "🀁", "🀂", "🀃", "🀄", "🀅"]; // Winds/Dragons for variety, or also Myriads if preferred
 
-function createInitialGrids(): { g1: Tile[][], g2: Tile[][], p1Pool: Tile[], p2Pool: Tile[] } {
+function createInitialGrids(): { g1: Tile[][], g2: Tile[][], sharedPool: Tile[] } {
   const p1Tiles: Tile[] = [];
   const p2Tiles: Tile[] = [];
   
@@ -68,16 +79,15 @@ function createInitialGrids(): { g1: Tile[][], g2: Tile[][], p1Pool: Tile[], p2P
     }
   });
 
-  // Shuffle
-  const s1 = [...p1Tiles].sort(() => Math.random() - 0.5);
-  const s2 = [...p2Tiles].sort(() => Math.random() - 0.5);
+  // Shuffle together
+  const sharedPool = [...p1Tiles, ...p2Tiles].sort(() => Math.random() - 0.5);
 
   const grid1: Tile[][] = [[], [], [], [], [], []];
   const grid2: Tile[][] = [[], [], [], [], [], []];
   
-  // Grids start empty as requested. All 36 tiles stay in the pools.
+  // Grids start empty as requested. All 72 tiles stay in the shared pool.
 
-  return { g1: grid1, g2: grid2, p1Pool: s1, p2Pool: s2 };
+  return { g1: grid1, g2: grid2, sharedPool };
 }
 
 async function startServer() {
@@ -92,19 +102,18 @@ async function startServer() {
     gameState.timer = 10;
     
     turnInterval = setInterval(() => {
-      if (gameState.status === "playing") {
+      if (gameState.status === "playing" && !gameState.isPaused) {
         gameState.timer -= 1;
         
         if (gameState.timer <= 0) {
-          // Time's up! Return tile to pool and switch turn
+          // Time's up! Return tile to shared pool and draw next
           if (gameState.activeTile) {
             const currentP = gameState.players[gameState.turn];
             currentP.lastTileSymbol = gameState.activeTile.symbol; // Mark as last used
-            currentP.pool.push(gameState.activeTile);
+            gameState.sharedPool.push(gameState.activeTile);
             gameState.activeTile = null;
           }
           
-          gameState.turn = (gameState.turn + 1) % 2;
           drawNextTile();
           gameState.timer = 10;
           io.emit("gameState", gameState);
@@ -145,28 +154,56 @@ async function startServer() {
   }
 
   function drawNextTile() {
-    const nextP = gameState.players[gameState.turn];
-    if (nextP.pool.length > 0) {
-      // Try to find a tile with a different symbol than the last one
+    if (gameState.sharedPool.length > 0) {
       let tileIndex = -1;
-      if (nextP.lastTileSymbol) {
-        tileIndex = nextP.pool.findIndex(t => t.symbol !== nextP.lastTileSymbol);
+      
+      // Try to find a valid tile
+      // Constraints:
+      // 1. If a player has had 5 consecutive turns, we MUST pick a tile for the OTHER player.
+      // 2. Try to avoid the last tile symbol for the player whose tile we pick.
+      
+      const forcedOwner = gameState.consecutiveTurns >= 5 ? (1 - gameState.lastTurnOwner!) : null;
+      
+      // Find candidate indices
+      const candidates = gameState.sharedPool.map((t, idx) => ({ tile: t, idx }))
+        .filter(c => forcedOwner === null || c.tile.owner === forcedOwner);
+        
+      if (candidates.length > 0) {
+        // Try to find one that doesn't match the owner's last tile symbol
+        let bestCandidates = candidates.filter(c => {
+          const ownerP = gameState.players[c.tile.owner];
+          return ownerP.lastTileSymbol !== c.tile.symbol;
+        });
+        
+        if (bestCandidates.length === 0) {
+          bestCandidates = candidates; // Fallback to any valid candidate
+        }
+        
+        // Pick a random one from best candidates
+        const chosen = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+        tileIndex = chosen.idx;
+      } else {
+        // If no candidates match forced owner (should be rare), just pick any random tile
+        tileIndex = Math.floor(Math.random() * gameState.sharedPool.length);
       }
 
-      // If no different symbol found or no last symbol, pick random
-      if (tileIndex === -1) {
-        tileIndex = Math.floor(Math.random() * nextP.pool.length);
-      }
-
-      const [tile] = nextP.pool.splice(tileIndex, 1);
+      const [tile] = gameState.sharedPool.splice(tileIndex, 1);
       gameState.activeTile = tile;
+      gameState.turn = tile.owner;
+      
+      if (gameState.lastTurnOwner === tile.owner) {
+        gameState.consecutiveTurns++;
+      } else {
+        gameState.lastTurnOwner = tile.owner;
+        gameState.consecutiveTurns = 1;
+      }
     } else {
       gameState.activeTile = null;
     }
   }
 
   function handlePushTile(colIndex: number) {
-    if (!gameState.activeTile) return;
+    if (gameState.status !== "playing" || !gameState.activeTile) return;
 
     const pIdx = gameState.turn;
     const grid = gameState.players[pIdx].grid;
@@ -178,17 +215,13 @@ async function startServer() {
     // Push active tile into top
     column.unshift(gameState.activeTile);
     
-    // If column exceeds 6, bottom tile falls out and goes back to its owner's pool
+    // If column exceeds 6, bottom tile falls out and goes back to shared pool
     if (column.length > 6) {
       const poppedTile = column.pop()!;
-      const ownerP = gameState.players[poppedTile.owner];
-      ownerP.pool.push(poppedTile);
+      gameState.sharedPool.push(poppedTile);
     }
     
-    // Turn always switches in this version
-    gameState.turn = (pIdx + 1) % 2;
-    
-    // Draw new active tile for the next player
+    // Draw new active tile (this determines the next turn)
     drawNextTile();
 
     // Reset timer
@@ -250,7 +283,6 @@ async function startServer() {
           id: socket.id,
           name: name || `Oyuncu ${gameState.players.length + 1}`,
           grid: [],
-          pool: [],
         };
         gameState.players.push(newPlayer);
         
@@ -277,14 +309,17 @@ async function startServer() {
         gameState.diceResults = { p1, p2 };
         
         if (p1 !== p2) {
-          gameState.turn = p1 > p2 ? 0 : 1;
-          const { g1, g2, p1Pool, p2Pool } = createInitialGrids();
+          const startingPlayer = p1 > p2 ? 0 : 1;
+          const { g1, g2, sharedPool } = createInitialGrids();
           gameState.players[0].grid = g1;
-          gameState.players[0].pool = p1Pool;
           gameState.players[1].grid = g2;
-          gameState.players[1].pool = p2Pool;
+          gameState.sharedPool = sharedPool;
+          gameState.consecutiveTurns = 0;
+          gameState.lastTurnOwner = null;
           
-          // Initial draw
+          // Initial draw - force it to be the starting player's tile
+          gameState.consecutiveTurns = 5; // Hack to force the next draw to be the starting player
+          gameState.lastTurnOwner = 1 - startingPlayer;
           drawNextTile();
           
           gameState.status = "playing";
@@ -335,7 +370,6 @@ async function startServer() {
           id: "robot-id",
           name: "Robot",
           grid: [[], [], [], [], [], []],
-          pool: [],
         };
         gameState.players.push(robotPlayer);
         gameState.status = "rolling";
@@ -350,7 +384,6 @@ async function startServer() {
       const currentPlayers = gameState.players.map(p => ({
         ...p,
         grid: [[], [], [], [], [], []],
-        pool: [],
         lastTileSymbol: undefined
       }));
 
@@ -362,6 +395,12 @@ async function startServer() {
         winner: null,
         diceResults: null,
         timer: 10,
+        sharedPool: [],
+        consecutiveTurns: 0,
+        lastTurnOwner: null,
+        isPaused: false,
+        pauseInitiatorId: null,
+        resumeRequestedById: null,
       };
 
       if (gameState.status === "rolling" && gameState.players.some(p => p.id === "robot-id")) {
@@ -371,6 +410,57 @@ async function startServer() {
       }
 
       io.emit("gameState", gameState);
+    });
+
+    socket.on("surrender", () => {
+      if (gameState.status === "playing") {
+        const pIdx = gameState.players.findIndex(p => p.id === socket.id);
+        if (pIdx !== -1) {
+          const opponentIdx = (pIdx + 1) % 2;
+          const opponent = gameState.players[opponentIdx];
+          gameState.status = "finished";
+          gameState.winner = opponent ? opponent.name : "Rakip";
+          io.emit("gameState", gameState);
+        }
+      }
+    });
+
+    socket.on("pauseGame", () => {
+      if (gameState.status === "playing" && !gameState.isPaused) {
+        gameState.isPaused = true;
+        gameState.pauseInitiatorId = socket.id;
+        io.emit("gameState", gameState);
+      }
+    });
+
+    socket.on("requestResume", () => {
+      if (gameState.status === "playing" && gameState.isPaused) {
+        const opponent = gameState.players.find(p => p.id !== socket.id);
+        if (opponent && opponent.id === "robot-id") {
+          gameState.isPaused = false;
+          gameState.pauseInitiatorId = null;
+          gameState.resumeRequestedById = null;
+        } else {
+          gameState.resumeRequestedById = socket.id;
+        }
+        io.emit("gameState", gameState);
+      }
+    });
+
+    socket.on("acceptResume", () => {
+      if (gameState.status === "playing" && gameState.isPaused && gameState.resumeRequestedById) {
+        gameState.isPaused = false;
+        gameState.pauseInitiatorId = null;
+        gameState.resumeRequestedById = null;
+        io.emit("gameState", gameState);
+      }
+    });
+
+    socket.on("declineResume", () => {
+      if (gameState.status === "playing" && gameState.isPaused && gameState.resumeRequestedById) {
+        gameState.resumeRequestedById = null;
+        io.emit("gameState", gameState);
+      }
     });
 
     socket.on("disconnect", () => {
@@ -386,6 +476,12 @@ async function startServer() {
           winner: null,
           diceResults: null,
           timer: 10,
+          sharedPool: [],
+          consecutiveTurns: 0,
+          lastTurnOwner: null,
+          isPaused: false,
+          pauseInitiatorId: null,
+          resumeRequestedById: null,
         };
         io.emit("gameState", gameState);
       }
